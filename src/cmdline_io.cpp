@@ -25,14 +25,34 @@ void Pause() {
   }
 }
 
+void uintToHex(uint32_t num, char *s, bool lowerAlpha)
+{
+        uint32_t x = __builtin_bswap32 (num); // swap endianness
+	int i = 7;
+	while (i >= 0)
+	{
+		int digit = (x & 0x0F);
+		uint8_t ch = digit + '0';
+		if (ch > '9')
+			ch += (lowerAlpha) ? 0x27 : 7;
+
+		s[i] = ch;
+		x >>= 4;
+		i -= 1;
+	}
+}
+
 void Print(uint32_t pid, uint16_t iv1, uint16_t iv2, int method, int count) {
   if (count != 1 && count%3 == 1)
     Pause();
 
+  char pid_hex[8];
+  uintToHex(pid, pid_hex, true);
+
   int hp = (iv1&31), at = ((iv1>>5)&31), df = ((iv1>>10)&31), spa = ((iv2>>5)&31), spd = ((iv2>>10)&31), spe = (iv2&31);
   int hp_power = (((hp&2) >> 1) | (at&2) | ((df&2) << 1) | ((spe&2) << 2) | ((spa&2) << 3) | ((spd&2) << 4))*40/63 + 30;
   int hp_type = ((hp&1) | ((at&1) << 1) | ((df&1) << 2) | ((spe&1) << 3) | ((spa&1) << 4) | ((spd&1) << 5))*15/63;
-  cout << BAR << count << ": " << pid << " (" << METHOD[method] << ")\n" << ABILITY_TXT << ": " << AB_F_S[pid%2]
+  cout << BAR << count << ": " << pid << " / 0x" << pid_hex << " (" << METHOD[method] << ")\n" << ABILITY_TXT << ": " << AB_F_S[pid%2]
        << "\nIVs/Nat: " << hp << "-" << at << "-" << df << "-" << spa << "-" << spd << "-" << spe << "/" << NATURE[pid%25]
        << "\n" << GEN_VAL_TXT << ": " << (pid&255) << "\n" << HP_TXT << ": " << HP_TYPE[hp_type] << "-" << hp_power
        << BAR;
@@ -117,7 +137,7 @@ int AskAbility() {
     cout << ABILITY_ASK_MSG << ": ";
     cin >> ability;
   } while (ability != '2' && ability != '1' && ability != 'n');
-  return ((ability == 'n') + (ability != '1')); 
+  return ((ability == 'n') + (ability != '1'));
 }
 
 bool AskYN(const char* msg) {
