@@ -4,8 +4,11 @@
   */
 
 #include "func.h"
+#include <fstream>
 
-extern void Print(uint32_t pid, uint16_t iv1, uint16_t iv2, int method, int count);
+extern void Print(uint32_t pid, uint16_t iv1, uint16_t iv2, int method, int count, std::ostream& pid_stream);
+
+
 
 /* RNG constants */
 const uint32_t MULTIPLIER = 1103515245U;
@@ -95,7 +98,7 @@ bool XORtest(uint16_t pid_l, uint16_t pid_h, uint16_t IDxorSID) {
   return IDxorSID == 1 || ((pid_l^pid_h^IDxorSID)&0xFFF8) == 0;
 }
 
-void FindPID(uint32_t seed, uint16_t iv1, uint16_t iv2, const PokeData& pdata, int method, int &count) {
+void FindPID(uint32_t seed, uint16_t iv1, uint16_t iv2, const PokeData& pdata, int method, int &count, std::ofstream& pid_file) {
   uint16_t pid_h, pid_l;
   pid_h = antiRNG(seed);
   pid_l = antiRNG(seed);
@@ -104,21 +107,24 @@ void FindPID(uint32_t seed, uint16_t iv1, uint16_t iv2, const PokeData& pdata, i
     if (PIDtest(pid, pdata.nature, pdata.ability)
             && HPtest(iv1, iv2, pdata.hp_type, pdata.hp_power)
             && XORtest(pid_l, pid_h, pdata.IDxorSID))
-      Print(pid, iv1, iv2, method, ++count);
+      Print(pid, iv1, iv2, method, ++count, pid_file);
 }
 
 void TestAllPossibleSeedsBackwards(const PokeData& pdata, int gba, bool exact, int& count) {
+  std::ofstream pid_file;
+  pid_file.open("pid.out", std::ofstream::trunc);
   IVtester IVtest = GetIVtester(exact);
   for (int spa_ = (exact ? pdata.spa : 31); spa_ >= pdata.spa; spa_--)
     for (int spd_ = (exact ? pdata.spd : 31); spd_ >= pdata.spd; spd_--)
       for (int spe_ = (exact ? pdata.spe : 31); spe_ >= pdata.spe; spe_--) {
         uint32_t high_seed = (spe_ | (spa_ << 5) | (spd_ << 10)) << 16;
         for (uint32_t low_seed = 0; low_seed < 65536; low_seed++)
-          Test(low_seed | high_seed, pdata, gba, IVtest, count);
+          Test(low_seed | high_seed, pdata, gba, IVtest, count, pid_file);
       }
+    pid_file.close();
 }
 
-void FindChainedPID(uint32_t seed, int iv1, int iv2, const PokeData& pdata, int &count) {
+void FindChainedPID(uint32_t seed, int iv1, int iv2, const PokeData& pdata, int &count, std::ofstream& pid_file) {
   uint16_t pid_corrector = 0;
   for (int i = 15; i >= 3; i--)
     pid_corrector |= ((antiRNG(seed) & 1) << i);
@@ -128,10 +134,10 @@ void FindChainedPID(uint32_t seed, int iv1, int iv2, const PokeData& pdata, int 
   pid_l = ((antiRNG(seed) & 7) | pid_corrector);
   uint32_t pid = (pid_l | (pid_h << 16));
   if (PIDtest(pid, pdata.nature, pdata.ability))
-    Print(pid, iv1, iv2, -1, ++count);
+    Print(pid, iv1, iv2, -1, ++count, pid_file);
 }
 
-void Test(uint32_t seed, const PokeData& pdata, int gba, IVtester& IVtest, int &count) {
+void Test(uint32_t seed, const PokeData& pdata, int gba, IVtester& IVtest, int &count, std::ofstream& pid_file) {
   uint16_t n2 = seed >> 16;
   if (!HPpretest(n2, pdata.hp_type, pdata.hp_power))
     return;
@@ -140,17 +146,17 @@ void Test(uint32_t seed, const PokeData& pdata, int gba, IVtester& IVtest, int &
 
   if (IVtest(n1, pdata.hp, pdata.at, pdata.df)) {
     if (gba == -1)
-      return FindChainedPID(seed, n1, n2, pdata, count);
+      return FindChainedPID(seed, n1, n2, pdata, count, pid_file);
 
-    FindPID(seed, n1, n2, pdata, 0, count);
+    FindPID(seed, n1, n2, pdata, 0, count, pid_file);
     if (gba) {
       uint32_t seed_copy = seed;
       antiRNG(seed_copy);
-      FindPID(seed_copy, n1, n2, pdata, 1, count);
+      FindPID(seed_copy, n1, n2, pdata, 1, count, pid_file);
 
       if (gba > 1) {
         antiRNG(seed_copy);
-        FindPID(seed_copy, n1, n2, pdata, 4, count);
+        FindPID(seed_copy, n1, n2, pdata, 4, count, pid_file);
       }
     }
   }
@@ -158,11 +164,11 @@ void Test(uint32_t seed, const PokeData& pdata, int gba, IVtester& IVtest, int &
   if (gba) {
     n1 = antiRNG(seed);   
     if (IVtest(n1, pdata.hp, pdata.at, pdata.df)) {
-      FindPID(seed, n1, n2, pdata, 2, count);
+      FindPID(seed, n1, n2, pdata, 2, count, pid_file);
 
       if (gba > 1) {
         antiRNG(seed);
-        FindPID(seed, n1, n2, pdata, 3, count);
+        FindPID(seed, n1, n2, pdata, 3, count, pid_file);
       }
     }
   }
@@ -172,34 +178,37 @@ bool HighPIDmatches(uint32_t state, uint16_t pid_h) {
   return RNG(state) == pid_h;
 }
 
-void GetFromSeed(uint32_t seed, int &count, int gba) {
+void GetFromSeed(uint32_t seed, int &count, int gba, std::ofstream& pid_file) {
   uint32_t pid = ((seed >> 16) | (RNG(seed) << 16));
   uint16_t n2, n3;
   n2 = RNG(seed);
   n3 = RNG(seed);
-  Print(pid, n2, n3, 0, ++count);
+  Print(pid, n2, n3, 0, ++count, pid_file);
 
   if (gba) {
     uint16_t n4;
     n4 = RNG(seed);
-    Print(pid, n3, n4, 1, ++count);
-    Print(pid, n2, n4, 2, ++count);
+    Print(pid, n3, n4, 1, ++count, pid_file);
+    Print(pid, n2, n4, 2, ++count, pid_file);
 
     if (gba > 1) {
       uint16_t n5;
       n5 = RNG(seed);
-      Print(pid, n3, n5, 3, ++count);  
-      Print(pid, n4, n5, 4, ++count);
+      Print(pid, n3, n5, 3, ++count, pid_file);  
+      Print(pid, n4, n5, 4, ++count, pid_file);
     }
   }
 }
 
 void TestAllPossibleSeedsForwards(uint32_t pid, int gba, int& count) {
+  std::ofstream pid_file;
+  pid_file.open("pid.out", std::ofstream::trunc);
   uint32_t high_seed = pid << 16; // Any RNG state that leads to the PID must start with this
   uint16_t high_pid = pid >> 16;
   for (uint32_t low_seed = 0; low_seed < 65536; low_seed++)
     if (HighPIDmatches(low_seed | high_seed, high_pid))
-      GetFromSeed(low_seed | high_seed, count, gba);
+      GetFromSeed(low_seed | high_seed, count, gba, pid_file);
+  pid_file.close();
 }
 
 uint16_t maxSIDforShiny(uint32_t pid, uint16_t id) {

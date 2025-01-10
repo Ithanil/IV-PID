@@ -7,13 +7,14 @@
 #define __IO_H__
 
 #include <stdint.h>
+#include <iostream>
 
 void Pause();
 
 /**
   * @brief Prints a given IV-PID combination
   */
-void Print(uint32_t pid, uint16_t iv1, uint16_t iv2, int method, int count);
+void Print(uint32_t pid, uint16_t iv1, uint16_t iv2, int method, int count, std::ostream& pid_stream);
 
 /**
   * @brief Shows all natures and their IDs

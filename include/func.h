@@ -7,6 +7,7 @@
 #define __FUNC_H__
 
 #include <stdint.h> // so PID, RNG, ID, etc get the proper integer size
+#include <fstream>
 
 /**
   * @param state Current state of the RNG
@@ -119,7 +120,7 @@ struct PokeData {
   * @note two PIDs might be found if both the PID for seed and the PID for
   * seed xor 0x8000 0000 match the conditions.
   */
-void FindPID(uint32_t seed, uint16_t iv1, uint16_t iv2, const PokeData& pdata, int method, int &count);
+void FindPID(uint32_t seed, uint16_t iv1, uint16_t iv2, const PokeData& pdata, int method, int &count, std::ofstream& pid_file);
 
 /**
   * @brief Explores all possible seeds backwards
@@ -144,7 +145,7 @@ void TestAllPossibleSeedsBackwards(const PokeData& pdata, int gba, bool exact, i
   * @param pdata  Data to match
   * @param count  Number of results so far
   */
-void FindChainedPID(uint32_t seed, int iv1, int iv2, const PokeData& pdata, int &count);
+void FindChainedPID(uint32_t seed, int iv1, int iv2, const PokeData& pdata, int &count, std::ofstream& pid_file);
 
 /**
   * @brief Tests if a given RNG state leads to wanted IVs and data
@@ -157,7 +158,7 @@ void FindChainedPID(uint32_t seed, int iv1, int iv2, const PokeData& pdata, int 
   * Explores all possible results from a particular RNG state in order to find
   * any results that match the wanted \p pdata.
   */
-void Test(uint32_t seed, const PokeData& pdata, int gba, IVtester& IVtest, int &count);
+void Test(uint32_t seed, const PokeData& pdata, int gba, IVtester& IVtest, int &count, std::ofstream& pid_file);
 
 /**
   * @brief Checks if a RNG state generates a given PID
@@ -174,7 +175,7 @@ bool HighPIDmatches(uint32_t state, uint16_t pid_h);
   * @param count Number of results found so far
   * @param gba   Allowed methods
   */
-void GetFromSeed(uint32_t seed, int &count, int gba);
+void GetFromSeed(uint32_t seed, int &count, int gba, std::ofstream& pid_file);
 
 /**
   * @brief Explores all possible seeds forwards

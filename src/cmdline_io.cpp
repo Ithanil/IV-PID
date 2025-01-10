@@ -42,9 +42,9 @@ void uintToHex(uint32_t num, char *s, bool lowerAlpha)
 	}
 }
 
-void Print(uint32_t pid, uint16_t iv1, uint16_t iv2, int method, int count) {
-  if (count != 1 && count%3 == 1)
-    Pause();
+void Print(uint32_t pid, uint16_t iv1, uint16_t iv2, int method, int count, std::ostream& pid_stream=std::cout) {
+  //if (count != 1 && count%3 == 1)
+  //  Pause();
 
   char pid_hex[8];
   uintToHex(pid, pid_hex, true);
@@ -56,6 +56,7 @@ void Print(uint32_t pid, uint16_t iv1, uint16_t iv2, int method, int count) {
        << "\nIVs/Nat: " << hp << "-" << at << "-" << df << "-" << spa << "-" << spd << "-" << spe << "/" << NATURE[pid%25]
        << "\n" << GEN_VAL_TXT << ": " << (pid&255) << "\n" << HP_TXT << ": " << HP_TYPE[hp_type] << "-" << hp_power
        << BAR;
+  pid_stream << pid << ",0x" << pid_hex << "\n";
 }
 
 bool AvoidLoops() {
